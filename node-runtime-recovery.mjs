@@ -153,6 +153,7 @@ export const runRespawnedChild = (command, args, env) => {
                 : undefined
           : undefined;
       process.exit(forwardedSignalExitCode ?? 1);
+      return;
     }
     process.exit(code ?? 1);
   });
