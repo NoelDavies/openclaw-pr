@@ -111,6 +111,36 @@ metadata: |
         self.assertFalse(valid)
         self.assertEqual(message, "Description must not be empty")
 
+    def test_fallback_parser_rejects_stray_indentation_on_scalar_value(self):
+        skill_dir = self.temp_dir / "stray-indent-skill"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        content = (
+            "---\n"
+            "name: valid-skill\n"
+            "description: short\n"
+            "  extra info accidentally indented\n"
+            "---\n"
+            "# Skill\n"
+        )
+        (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+        previous_yaml = quick_validate.yaml
+        quick_validate.yaml = None
+        try:
+            valid, message = quick_validate.validate_skill(skill_dir)
+        finally:
+            quick_validate.yaml = previous_yaml
+
+        # "description: short" is a plain scalar, not a block (">" or "|")
+        # scalar, so the following indented line is not a legal
+        # continuation and must be rejected rather than silently merged
+        # into the description value.
+        self.assertFalse(valid)
+        self.assertEqual(
+            message,
+            "Invalid YAML in frontmatter: unsupported syntax without PyYAML installed",
+        )
+
     def test_accepts_openclaw_invocation_frontmatter(self):
         skill_dir = self.temp_dir / "invocable-skill"
         skill_dir.mkdir(parents=True, exist_ok=True)

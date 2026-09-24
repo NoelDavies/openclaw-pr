@@ -33,6 +33,7 @@ def _parse_simple_frontmatter(frontmatter_text: str) -> Optional[dict[str, str]]
     """
     parsed: dict[str, str] = {}
     current_key: Optional[str] = None
+    in_block_scalar = False
     for raw_line in frontmatter_text.splitlines():
         stripped = raw_line.strip()
         if not stripped or stripped.startswith("#"):
@@ -40,7 +41,13 @@ def _parse_simple_frontmatter(frontmatter_text: str) -> Optional[dict[str, str]]
 
         is_indented = raw_line[:1].isspace()
         if is_indented:
-            if current_key is None:
+            # An indented line is only a legal continuation when the
+            # current key's value opened a block scalar ("|" or ">",
+            # optionally with chomping/indentation indicators). A plain
+            # scalar like `name: foo` cannot be continued on the next
+            # line, so treat that as invalid syntax instead of silently
+            # merging the stray line into the value.
+            if current_key is None or not in_block_scalar:
                 return None
             current_value = parsed[current_key]
             parsed[current_key] = (
@@ -61,6 +68,11 @@ def _parse_simple_frontmatter(frontmatter_text: str) -> Optional[dict[str, str]]
             value = value[1:-1]
         parsed[key] = value
         current_key = key
+        # A key with no inline value opens either a block scalar ("|" or
+        # ">", optionally with chomping/indentation indicators) or a
+        # nested sequence/mapping - both are continued on indented lines.
+        # A key with a plain inline scalar value cannot be continued.
+        in_block_scalar = value == "" or bool(re.match(r"^[|>][+-]?\d*$", value))
     return parsed
 
 
