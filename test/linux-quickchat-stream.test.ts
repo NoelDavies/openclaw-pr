@@ -8,6 +8,10 @@ const quickchatSource = readFileSync(
   new URL("../apps/linux/ui/quickchat.js", import.meta.url),
   "utf8",
 );
+const quickchatHtml = readFileSync(
+  new URL("../apps/linux/ui/quickchat.html", import.meta.url),
+  "utf8",
+);
 const tauriConfig = JSON.parse(
   readFileSync(new URL("../apps/linux/src-tauri/tauri.conf.json", import.meta.url), "utf8"),
 ) as {
@@ -438,6 +442,19 @@ test("gateway state updates and clears the Quick Chat user accent", () => {
 
   harness.emitGatewayState({ state: "up" });
   assert.equal(harness.accent(), "");
+});
+
+test("the reply state label stays in the accessibility tree so an aborted reply is announced", () => {
+  const replyStateMarkup = quickchatHtml.match(/<span id="reply-state"[^>]*>/u)?.[0];
+  assert.ok(replyStateMarkup, "the #reply-state element exists in quickchat.html");
+  // #reply-state is where applyChatEvent writes "Stopped" for an aborted reply. Its parent
+  // #reply section is aria-live="polite", but aria-hidden on this element itself removes it
+  // from the accessibility tree entirely, so a screen reader never announces that text.
+  assert.doesNotMatch(
+    replyStateMarkup as string,
+    /aria-hidden\s*=\s*"true"/u,
+    "the reply state label must not be hidden from assistive tech, or a stopped/aborted reply is never announced",
+  );
 });
 
 test("widget child webviews inherit no Quick Chat Tauri capability", () => {
