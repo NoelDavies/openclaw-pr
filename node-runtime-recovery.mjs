@@ -148,7 +148,9 @@ export const runRespawnedChild = (command, args, env) => {
             ? 130
             : signal === "SIGTERM"
               ? 143
-              : undefined
+              : signal === "SIGBREAK"
+                ? 149
+                : undefined
           : undefined;
       process.exit(forwardedSignalExitCode ?? 1);
     }
