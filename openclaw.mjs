@@ -334,16 +334,23 @@ const resolvePrecomputedCommandHelpByName = (commandName) => {
 
 const resolvePrecomputedCommandHelp = (argv) => {
   const args = argv.slice(2);
+  let literal = false;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (!arg || arg === "--") {
+    if (!arg) {
       return null;
+    }
+    if (!literal && arg === "--") {
+      // A leading terminator still leaves a command to discover, matching
+      // getRootOptionAwareCommandPath's literal-mode command discovery.
+      literal = true;
+      continue;
     }
     // The runtime entry owns profile validation and config projection before cached help.
-    if (arg === "--dev" || arg === "--profile" || arg.startsWith("--profile=")) {
+    if (!literal && (arg === "--dev" || arg === "--profile" || arg.startsWith("--profile="))) {
       return null;
     }
-    const consumed = consumeLauncherRootOptionToken(args, index);
+    const consumed = literal ? 0 : consumeLauncherRootOptionToken(args, index);
     if (consumed > 0) {
       index += consumed - 1;
       continue;

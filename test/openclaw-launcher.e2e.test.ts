@@ -1034,6 +1034,33 @@ describe("openclaw launcher", () => {
     expect(result.stdout).toBe("PRECOMPUTED models help\n");
   });
 
+  it("uses precomputed subcommand help after a leading -- terminator", async () => {
+    const fixtureRoot = await makeLauncherFixture(fixtures);
+    await fs.writeFile(
+      path.join(fixtureRoot, "dist", "cli-startup-metadata.json"),
+      JSON.stringify({ subcommandHelpText: { config: "PRECOMPUTED config help\n" } }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(fixtureRoot, "dist", "entry.js"),
+      "throw new Error('subcommand help fast path must not import runtime resource owners');\n",
+      "utf8",
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [path.join(fixtureRoot, "openclaw.mjs"), "--", "config", "--help"],
+      {
+        cwd: fixtureRoot,
+        env: launcherEnv(),
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("PRECOMPUTED config help\n");
+  });
+
   it.each(
     [
       ["--profile", "work", "nodes", "--help"],
