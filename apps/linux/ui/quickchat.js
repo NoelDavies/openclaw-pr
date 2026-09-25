@@ -795,9 +795,9 @@ function terminalizeDisconnectedReply() {
   activeReply.terminal = true;
   stopReplyThinking();
   elements.reply.classList.add("has-error", "is-terminal");
+  expandReplyForAnnouncement();
   elements.replyState.textContent = "Interrupted";
   elements.replyError.textContent = "Connection lost before the reply completed.";
-  expandReplyForAnnouncement();
   scrollReplyToEnd();
 }
 
@@ -880,17 +880,17 @@ function applyChatEvent(payload) {
     elements.replyState.textContent = "";
   } else if (payload.state === "aborted") {
     activeReply.text = `${activeReply.text || ""}${activeReply.text ? "\n\n" : ""}(stopped)`;
-    elements.replyState.textContent = "Stopped";
     expandReplyForAnnouncement();
+    elements.replyState.textContent = "Stopped";
     renderReplyText();
   } else {
     elements.reply.classList.add("has-error");
+    expandReplyForAnnouncement();
     elements.replyState.textContent = "Error";
     elements.replyError.textContent =
       typeof payload.errorMessage === "string" && payload.errorMessage.trim()
         ? payload.errorMessage
         : "Gateway reply failed.";
-    expandReplyForAnnouncement();
     scrollReplyToEnd();
   }
   updateSendButton();
