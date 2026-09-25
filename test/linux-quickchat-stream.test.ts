@@ -342,6 +342,8 @@ this.harness = {
   readOnly() { return elements.input.readOnly; },
   sendDisabled() { return elements.send.disabled; },
   replyVisible() { return !elements.reply.hidden; },
+  replyState() { return elements.replyState.textContent; },
+  replyStateHidden() { return elements.reply.hidden || elements.replyState.hidden; },
   thinking() { return !elements.replyThinking.hidden; },
   draft() { return elements.input.value; },
   error() { return elements.status.textContent; },
@@ -454,6 +456,82 @@ test("the reply state label stays in the accessibility tree so an aborted reply 
     replyStateMarkup as string,
     /aria-hidden\s*=\s*"true"/u,
     "the reply state label must not be hidden from assistive tech, or a stopped/aborted reply is never announced",
+  );
+});
+
+test("an aborted reply while expanded lands the Stopped label in a genuinely visible ancestor chain", async () => {
+  const harness = createQuickChatHarness();
+  harness.setGatewayUp();
+  harness.setMessage("Do the thing");
+  const sending = harness.send(false);
+  const target = { sessionKey: "global", agentId: "work", runId: "expanded-run" };
+  harness.resolveSend(target);
+  await sending;
+  await harness.drain();
+  assert.equal(harness.replyVisible(), true, "reply starts expanded after send");
+
+  harness.handleChatEvent({ ...target, state: "aborted" });
+  await harness.drain();
+
+  // Text alone is not enough: the announcement only reaches assistive tech if no ancestor
+  // (including #reply itself, which the collapse toggle hides via the `hidden` property) is hidden.
+  assert.equal(harness.replyState(), "Stopped");
+  assert.equal(harness.replyStateHidden(), false, "#reply-state's ancestor chain must stay visible");
+  assert.equal(harness.replyVisible(), true, "an already-expanded reply stays expanded");
+});
+
+test("a reply stopped while the section is collapsed auto-expands so Stopped is still announced", async () => {
+  const harness = createQuickChatHarness();
+  harness.setGatewayUp();
+  harness.setMessage("Do the thing");
+  const sending = harness.send(false);
+  const target = { sessionKey: "global", agentId: "work", runId: "collapsed-run" };
+  harness.resolveSend(target);
+  await sending;
+  await harness.drain();
+
+  harness.handleChatEvent({ ...target, state: "delta", deltaText: "Working…" });
+  await harness.drain();
+  harness.toggleReply();
+  await harness.drain();
+  assert.equal(harness.replyVisible(), false, "user collapsed the reply section mid-stream");
+
+  // Setting #reply-state's text is not sufficient on its own: the ancestor #reply section still
+  // carries `hidden`, which removes the whole subtree (including the live region) from the
+  // accessibility tree regardless of any descendant's own aria-hidden state.
+  harness.handleChatEvent({ ...target, state: "aborted" });
+  await harness.drain();
+
+  assert.equal(harness.replyState(), "Stopped");
+  assert.equal(
+    harness.replyVisible(),
+    true,
+    "a terminal Stopped status must auto-expand the reply section, or the announcement never reaches assistive tech",
+  );
+  assert.equal(harness.replyStateHidden(), false, "#reply-state's ancestor chain must stay visible");
+});
+
+test("a connection drop while collapsed auto-expands so Interrupted is still announced", async () => {
+  const harness = createQuickChatHarness();
+  harness.setGatewayUp();
+  harness.setMessage("Do the thing");
+  const sending = harness.send(false);
+  const target = { sessionKey: "global", agentId: "work", runId: "collapsed-disconnect-run" };
+  harness.resolveSend(target);
+  await sending;
+  await harness.drain();
+  harness.toggleReply();
+  await harness.drain();
+  assert.equal(harness.replyVisible(), false);
+
+  harness.emitGatewayState({ state: "down" });
+  await harness.drain();
+
+  assert.equal(harness.replyState(), "Interrupted");
+  assert.equal(
+    harness.replyVisible(),
+    true,
+    "a disconnect-driven Interrupted status must auto-expand the reply section too",
   );
 });
 
